@@ -1,7 +1,7 @@
 // https://www.youtube.com/watch?v=KLrcnwBQgCc
 // https://github.com/FuzedxPheonix/Leaftlet-Draw-Get-Started-Templated
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useImmerReducer } from 'use-immer';
 import '../App.css';
 import L from "leaflet";
@@ -22,49 +22,62 @@ const leafletDraw = require('leaflet-draw');
 
 
 function Map() {
-
-    let markerDrawer
-    let polylineDrawer
-    let polygonDrawer
-    let polygonEditor
-
     // IMMER REDUCER
     const initialState = {
         mapInstance: null,
-        polygonDrawer:null,
 
-        // polygon geometry
-        // polygonGeom: "",
+        // EDITING POLYGON GEOMETRY
+        drawnItems: null,
+        tempPolygon: "",
+        tempPolygonGeometry: "",
 
-        // switching menu
+        // POLYGON INFO
+        polygonName: "",
+        polygonGeometry: "",
+
+        // MENU PANELS
         showPlacesMenu: false,
         showPointsMenu: false,
         showLinesMenu: false,
         showPolygonsMenu: false,
-
-        // displaying polygon info
-        polygonName: "",
-        polygonGeometry: "",
- 
     };
 
     function reducerFunction(draft, action){
         switch(action.type){
-            case "getMap":
+            case "getMapInstance":
                 draft.mapInstance = action.mapData;
                 break;
-
-            case "getPolygonDrawer":
-                draft.mapInstance = action.polygonDraw;
+                
+            case "getDrawnItems":
+                draft.drawnItems = action.drawnItemsData;
                 break;
 
+            case "getTempPolygon":
+                draft.tempPolygon = action.tempPolygon;
+                break;
+            
+            case "getTempPolygonGeometry":
+                if (action.tempPolygonGeom === "resetShape"){
+                    draft.tempPolygonGeometry = "";
+                } else {
+                    draft.tempPolygonGeometry = action.tempPolygonGeom;
+                };
+                break;
+
+            case "getPolygonEditor":
+                draft.polygonEditor = action.polygonEditorData;
+                break;
+
+            // POLYGON INFO
             case "getPolygonInfo":
-                // draft.polygonGeom = action.polygonGeometry;
                 draft.polygonName = action.polygonName;
                 draft.polygonGeometry = action.polygonGeom;
                 break;
 
-            // switching menu
+
+
+
+            // SWITCHING MENU PANELS
             case "showPlacesMenu":
                 if (!action.isTrue){
                     draft.showPlacesMenu =  true
@@ -111,95 +124,101 @@ function Map() {
                 draft.showPlacesMenu = false;
                 draft.showPointsMenu = false;
                 draft.showLinesMenu = false;
-                break;
-        
+                break;   
             }
         };
 
     const [state, dispatch] = useImmerReducer(reducerFunction, initialState)
 
-    // LOADING MAP
+    // MAP SECTION - https://stackoverflow.com/questions/69697017/use-leaflet-map-object-outside-useeffect-in-react
+    // MAP REFS
+    const mapRef = useRef(null);
+    const tileRef = useRef(null);
+
+    // LEAFLET-DRAW REFS
+    const drawnItemsRef = useRef(null);
+    const drawControlRef = useRef(null);
+    const tempLayerRef = useRef(null);
+
+    const markerDrawerRef = useRef(null);
+    const polylineDrawerRef = useRef(null);
+    const polygonDrawerRef = useRef(null);
+    const polygonEditorRef = useRef(null);
+
+
+    // BASE TILE FOR THE MAP
+    tileRef.current = L.tileLayer(
+        `https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png`,
+        {
+        attribution:
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        }
+    );
+
+    // MAP INSTANCE OPTIONS
+    const mapParams = {
+        center: [50.0610, 19.935],
+        zoom: 13,
+        zoomControl: false,
+        zoomSnap: 0.75,
+        layers: [tileRef.current], // Start with just the base layer
+    };
+
+    // MAP CREATION
     useEffect(() => {
-        var map = L.map('mapid').setView([50.0610, 19.935], 13);
-        L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map); 
+        mapRef.current = L.map('map', mapParams);
+        dispatch({type: "getMapInstance", mapData : (mapRef.current)});
+      }, []);
 
-        dispatch({type:"getMap", mapData: map})
-    },[]);
 
-    // LEAFLET DRAW SETUP
-    const drawnItems = new L.FeatureGroup()
-    if (state.mapInstance) {
-        
-        ;
+    // DRAWN ITEMS & DRAW CONTROL
+    useEffect(() => {
+        if (!state.mapInstance) return;
+        if (state.mapInstance) {
+            drawnItemsRef.current = new L.FeatureGroup()
+            drawControlRef.current = new L.Control.Draw({
+                draw:{
+                    circle:false,
+                    rectangle:false,
+                },
+                edit:{
+                    featureGroup:drawnItemsRef.current
+                }
+            });
+            polygonEditorRef.current = new L.EditToolbar.Edit(state.mapInstance, {
+                featureGroup: drawnItemsRef.current,
+            });
 
-        markerDrawer =  new L.Draw.Marker(state.mapInstance, {icon:new L.Icon.Default()})
-        polylineDrawer = new L.Draw.Polyline(state.mapInstance);
-        polygonDrawer = new L.Draw.Polygon(state.mapInstance); 
-        polygonEditor = new L.EditToolbar.Edit(state.mapInstance, {
-            featureGroup: drawnItems,
-        });
+            // make 1 dispatch from these 3
+            dispatch({type: "getDrawnItems", drawnItemsData : (drawnItemsRef.current)},);
+            dispatch({type: "getPolygonEditor", polygonEditorData : (polygonEditorRef.current)},);
+            dispatch({type: "getDrawControl", drawControlData : (drawControlRef.current)});
 
-        state.mapInstance.addLayer(drawnItems);
-        
-        const drawControl = new L.Control.Draw({
-            draw:{
-                circle:false,
-                rectangle:false,
-                circlemarker:false
-            },
-            edit: {
-                featureGroup: drawnItems
-            }
-        });
-        // state.mapInstance.addControl(drawControl);
-    
-        state.mapInstance.on('draw:created', function(e){
-            drawnItems.addLayer(e.layer);})
-    };
+            // TESTING EVENTS
+            // drawnItemsRef.current.addTo(state.mapInstance);
+            // drawControlRef.current.addTo(state.mapInstance);
 
-    const addPolygon = e =>{
-        polygonDrawer.enable()
-    };
+            // state.mapInstance.on('draw:created', function(e){
+            //     drawnItemsRef.current.addLayer(e.layer);
+            //     console.log('Created', e);
+            // });
 
-    const editPolygon = e =>{
-        const tempLayer = L.polygon(state.polygonGeometry)
-        // drawnItems.addLayer(tempLayer)
-        polygonEditor.enabled() ? drawnItems.clearLayers() : drawnItems.addLayer(tempLayer)
-        polygonEditor.enabled() ? polygonEditor.disable() : polygonEditor.enable()
-    };
+            // state.mapInstance.on('draw:editstart', function(e){
+            //     console.log('Start editing', e.target._layers);
+            // });
+
+            // state.mapInstance.on('draw:edited ', function(e){
+            //     // console.log('Edited', e.target);
+            //     console.log('Edited', Object.values(e.target._layers).pop());
+            // });
+        }
+    }, [state.mapInstance]);
 
     
     // ADDING POLYGONS
     useEffect(() => {
-        // function getFeatureInfo(e){
-        //     state.mapInstance.fitBounds(e.target.getBounds());
-        //     dispatch({
-        //         type:"getPolygonInfo", 
-        //         polygonGeometry: e.target.getLatLngs()})
-        //         // polygonGeometry: e.target.toGeoJSON().geometry.coordinates[0]})
-            
-        //     console.log(e.target);
-        //     console.log(e.target.getLatLngs());
-        //     console.log(e.target.toGeoJSON());
-
-        //     const drawnItems = new L.FeatureGroup();
-        //     const tempLayer = L.polygon(e.target.getLatLngs())
-
-        //     polygonEditor = new L.EditToolbar.Edit(state.mapInstance, {
-        //         featureGroup: drawnItems,
-        //     });
-        //     state.mapInstance.addLayer(drawnItems);
-
-
-        //     drawnItems.addLayer(tempLayer)
-        //     polygonEditor.enable()
-        // };
-
         function getFeatureInfo(e){
             dispatch({type: "showPolygonsMenu", isTrue:state.showPolygonsMenu})
-            console.log("ttt", e.target)
             dispatch({type:"getPolygonInfo", 
                 polygonName: e.target.feature.properties.name,
                 polygonGeom: e.target.getLatLngs(),
@@ -213,7 +232,6 @@ function Map() {
             })
         };
 
-
         if (state.mapInstance){
             L.geoJSON(PolygonsTest, {
                 onEachFeature: onEachFeature
@@ -222,75 +240,59 @@ function Map() {
     },[state.mapInstance]);
 
 
-    function changePolygonGeometry(e){
 
-        const drawnItems = new L.FeatureGroup();
-        const tempLayer = L.polygon(state.polygonGeometry)
+    // EDITING POLYGON GEOMETRY
+    const editPolygon = e => {
+        state.drawnItems.clearLayers();
 
-        polygonEditor = new L.EditToolbar.Edit(state.mapInstance, {
-            featureGroup: drawnItems,
-        });
-        state.mapInstance.addLayer(drawnItems);
+        tempLayerRef.current = null;
 
+        if (state.tempPolygonGeometry){
+            tempLayerRef.current = new L.polygon(state.tempPolygonGeometry, {color:"red", fillColor:"red"})
+        } else {
+            tempLayerRef.current = new L.polygon(state.polygonGeometry, {color:"red", fillColor:"red"})
+            dispatch({type:"getTempPolygon", tempPolygon:tempLayerRef.current})
+        };
 
-        drawnItems.addLayer(tempLayer)
-        polygonEditor.enable()
+        state.drawnItems.addLayer(tempLayerRef.current)
+        state.mapInstance.addLayer(state.drawnItems);
 
-        state.mapInstance.on('draw:edited', function(e){
-            console.log("edited", e)
-        })
+        state.polygonEditor.enable();
     };
 
-    
-    
+  
+    const savePolygonChange = e => {
+        console.log("Changes saved")
 
-    
-    
+        state.polygonEditor.save()
+        let newShape = state.tempPolygon.getLatLngs()
+        // let newShape = state.tempPolygon.toGeoJSON().geometry.coordinates
 
-    
+        console.log(state.tempPolygon.getLatLngs())
+        console.log(state.tempPolygon.toGeoJSON())
+
+        dispatch({type:"getTempPolygonGeometry", tempPolygonGeom : newShape})
+
+        state.polygonEditor.disable()
+
+        // let tempLyrId = state.drawnItems.getLayerId(state.tempPolygon)
+        // console.log(tempLyrId)
+        // let modifiedLyr = state.drawnItems.getLayer(tempLyrId)
+        // let newShape = modifiedLyr.toGeoJSON().features[0].geometry
+        // let newShape = modifiedLyr.getLatLngs()
+    };
+
+    const cancelPolygonChange = e => {
+        state.drawnItems.clearLayers();
+        state.mapInstance.removeLayer(state.drawnItems);
+        state.polygonEditor.disable();
+        dispatch({type:"getTempPolygonGeometry",tempPolygonGeom : "resetShape"})
+    };
+
 
     return (
         <>
             <Grid container>         
-
-                {/* <Grid item xs={4} style={{marginTop:"0.5rem"}}>
-
-                    <Typography variant="h4">GEOMETRIE:</Typography>
-
-                    <Stack spacing={2} direction="column">
-                    <Button 
-                        variant="contained"
-                        onClick={addPolygon}>
-                        Add polygon</Button>
-                    <Button 
-                        variant="contained"
-                        onClick={editPolygon}>
-                        Edit polygon</Button>
-
-                    <Grid item xs={5} style={{marginTop:"1rem"}}>
-                        <TextField 
-                            variant="standard"
-                            fullWidth
-                            multiline
-                            value = {state.polygonGeom}
-                            >
-
-                        </TextField>
-                    </Grid>
-
-
-
-                    <Button 
-                        variant="contained" 
-                        color="error">
-                        Delete polygon</Button>
-                    <Button 
-                        variant="contained" 
-                        color="error"
-                        onClick={Map.clearfeatureGroup}>
-                        Clear FeatureGroup</Button>
-                    </Stack>
-                </Grid> */}
                 <Grid item xs={4} style={{marginTop:"0.5rem", padding:"1rem"}}>
                     <Stack spacing={2} direction="column">
 
@@ -374,6 +376,7 @@ function Map() {
                                 </Grid>
                                 <TextField id="outlined-basic" label ="Name" value={state.polygonName} variant="outlined" fullWidth size="small"/>
                                 <TextField id="outlined-basic" label="Geometry" value={state.polygonGeometry} variant="outlined" fullWidth size="small" multiline/>
+                                <TextField id="outlined-basic" label="Temp Geometry" value={state.tempPolygonGeometry} variant="outlined" fullWidth size="small" multiline/>
                                 <Button 
                                     variant="contained" 
                                     style={{"backgroundColor":"black"}}
@@ -383,8 +386,14 @@ function Map() {
                                 <Button 
                                     variant="contained" 
                                     style={{"backgroundColor":"black"}}
-                                    // onClick={savePolygonGeometry}
+                                    onClick={savePolygonChange}
                                         > SAVE CHANGES
+                                </Button>
+                                <Button 
+                                    variant="contained" 
+                                    style={{"backgroundColor":"black"}}
+                                    onClick={cancelPolygonChange}
+                                        > CANCEL CHANGES
                                 </Button>
                             </Grid>
                         ) : ""}
@@ -397,7 +406,7 @@ function Map() {
 
                     {/* <Typography variant="h4">MAPA:</Typography> */}
                     <div style={{height:"100vh"}}>
-                        <div id="mapid"></div>
+                        <div id="map"></div>
                     </div>
                 </Grid>
 
