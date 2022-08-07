@@ -26,6 +26,9 @@ function Map() {
     const initialState = {
         mapInstance: null,
 
+        // EDITING MODE
+        isEdited: false,
+
         // EDITING POLYGON GEOMETRY
         drawnItems: null,
         tempPolygon: "",
@@ -47,7 +50,23 @@ function Map() {
             case "getMapInstance":
                 draft.mapInstance = action.mapData;
                 break;
-                
+
+            // EDITING MODE
+            case "turnOnEditing":
+                draft.isEdited = true;
+                break;
+
+            case "turnOffEditing":
+                draft.isEdited = false;
+                break;
+            
+            // POLYGON INFO
+            case "getPolygonInfo":
+                draft.polygonName = action.polygonName;
+                draft.polygonGeometry = action.polygonGeom;
+                break;
+            
+            // EDITING POLYGON GEOMETRY
             case "getDrawnItems":
                 draft.drawnItems = action.drawnItemsData;
                 break;
@@ -68,11 +87,7 @@ function Map() {
                 draft.polygonEditor = action.polygonEditorData;
                 break;
 
-            // POLYGON INFO
-            case "getPolygonInfo":
-                draft.polygonName = action.polygonName;
-                draft.polygonGeometry = action.polygonGeom;
-                break;
+ 
 
 
 
@@ -139,6 +154,7 @@ function Map() {
     const drawnItemsRef = useRef(null);
     const drawControlRef = useRef(null);
     const tempLayerRef = useRef(null);
+    const tempNewShapeRef = useRef(null);
 
     const markerDrawerRef = useRef(null);
     const polylineDrawerRef = useRef(null);
@@ -243,16 +259,17 @@ function Map() {
 
     // EDITING POLYGON GEOMETRY
     const editPolygon = e => {
+
+        dispatch({type:"turnOnEditing"})
+
         state.drawnItems.clearLayers();
-
-        tempLayerRef.current = null;
-
         if (state.tempPolygonGeometry){
             tempLayerRef.current = new L.polygon(state.tempPolygonGeometry, {color:"red", fillColor:"red"})
         } else {
             tempLayerRef.current = new L.polygon(state.polygonGeometry, {color:"red", fillColor:"red"})
-            dispatch({type:"getTempPolygon", tempPolygon:tempLayerRef.current})
         };
+
+        dispatch({type:"getTempPolygon", tempPolygon:tempLayerRef.current})
 
         state.drawnItems.addLayer(tempLayerRef.current)
         state.mapInstance.addLayer(state.drawnItems);
@@ -261,28 +278,43 @@ function Map() {
     };
 
   
-    const savePolygonChange = e => {
+    const savePolygonChange = () => {
+        dispatch({type:"turnOffEditing"})
+
         console.log("Changes saved")
 
         state.polygonEditor.save()
-        let newShape = state.tempPolygon.getLatLngs()
+        tempNewShapeRef.current = state.tempPolygon.getLatLngs()
+        // let newShape = state.tempPolygon.getLatLngs()
         // let newShape = state.tempPolygon.toGeoJSON().geometry.coordinates
 
-        console.log(state.tempPolygon.getLatLngs())
-        console.log(state.tempPolygon.toGeoJSON())
+        // console.log(state.tempPolygon.getLatLngs())
+        // console.log(state.tempPolygon.toGeoJSON())
 
-        dispatch({type:"getTempPolygonGeometry", tempPolygonGeom : newShape})
+        // dispatch({type:"getTempPolygonGeometry", tempPolygonGeom : newShape})
+        dispatch({type:"getTempPolygonGeometry", tempPolygonGeom : tempNewShapeRef.current})
 
         state.polygonEditor.disable()
-
-        // let tempLyrId = state.drawnItems.getLayerId(state.tempPolygon)
-        // console.log(tempLyrId)
-        // let modifiedLyr = state.drawnItems.getLayer(tempLyrId)
-        // let newShape = modifiedLyr.toGeoJSON().features[0].geometry
-        // let newShape = modifiedLyr.getLatLngs()
     };
 
-    const cancelPolygonChange = e => {
+    const cancelPolygonChange = () => {
+        dispatch({type:"turnOffEditing"})
+
+        if (state.tempPolygonGeometry){
+            tempLayerRef.current = new L.polygon(state.tempPolygonGeometry, {color:"red", fillColor:"red"})
+        } else {
+            tempLayerRef.current = new L.polygon(state.polygonGeometry, {color:"red", fillColor:"red"})
+        };
+
+        state.drawnItems.clearLayers();
+        state.drawnItems.addLayer(tempLayerRef.current)
+        state.mapInstance.addLayer(state.drawnItems);
+
+        state.polygonEditor.disable();
+    };
+
+    const resetPolygonChange = () => {
+        dispatch({type:"turnOffEditing"})
         state.drawnItems.clearLayers();
         state.mapInstance.removeLayer(state.drawnItems);
         state.polygonEditor.disable();
@@ -377,24 +409,38 @@ function Map() {
                                 <TextField id="outlined-basic" label ="Name" value={state.polygonName} variant="outlined" fullWidth size="small"/>
                                 <TextField id="outlined-basic" label="Geometry" value={state.polygonGeometry} variant="outlined" fullWidth size="small" multiline/>
                                 <TextField id="outlined-basic" label="Temp Geometry" value={state.tempPolygonGeometry} variant="outlined" fullWidth size="small" multiline/>
-                                <Button 
+
+                                {!state.isEdited ? (
+                                    <Button 
                                     variant="contained" 
                                     style={{"backgroundColor":"black"}}
                                     onClick={editPolygon}
                                         > EDIT GEOMETRY
-                                </Button>
-                                <Button 
-                                    variant="contained" 
-                                    style={{"backgroundColor":"black"}}
-                                    onClick={savePolygonChange}
-                                        > SAVE CHANGES
-                                </Button>
-                                <Button 
-                                    variant="contained" 
-                                    style={{"backgroundColor":"black"}}
-                                    onClick={cancelPolygonChange}
-                                        > CANCEL CHANGES
-                                </Button>
+                                    </Button>
+                                ) : (
+                                    <div>
+                                        <Button 
+                                            variant="contained" 
+                                            style={{"backgroundColor":"black"}}
+                                            onClick={savePolygonChange}
+                                                > SAVE CHANGES
+                                        </Button>
+                                        <Button 
+                                            variant="contained" 
+                                            style={{"backgroundColor":"black"}}
+                                            onClick={cancelPolygonChange}
+                                                > CANCEL CHANGES
+                                        </Button>
+                                        <Button 
+                                            variant="contained" 
+                                            style={{"backgroundColor":"black"}}
+                                            onClick={resetPolygonChange}
+                                                > RESET CHANGES
+                                        </Button>
+                                    </div>
+                                )}
+                                
+                               
                             </Grid>
                         ) : ""}
 
