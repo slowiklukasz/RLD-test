@@ -15,10 +15,7 @@ import {Grid, AppBar, Stack, Button, Typography, TextField} from '@mui/material'
 // TESTING POLYGONS
 import PolygonsTest from './Assets/PolygonsTest.js'
 
-
 const leafletDraw = require('leaflet-draw');
-
-
 
 
 function Map() {
@@ -58,6 +55,7 @@ function Map() {
 
             case "turnOffEditing":
                 draft.isEdited = false;
+                draft.polygonEditor.disable();
                 break;
             
             // POLYGON INFO
@@ -87,10 +85,13 @@ function Map() {
                 draft.polygonEditor = action.polygonEditorData;
                 break;
 
- 
+            case "getPolygonDrawer":
+                draft.polygonDrawer = action.polygonDrawerData;
+                break;
 
-
-
+            case "getPolygonEditor":
+                draft.polygonEditor = action.polygonEditorData;
+                break;
 
             // SWITCHING MENU PANELS
             case "showPlacesMenu":
@@ -201,13 +202,17 @@ function Map() {
                     featureGroup:drawnItemsRef.current
                 }
             });
+
             polygonEditorRef.current = new L.EditToolbar.Edit(state.mapInstance, {
                 featureGroup: drawnItemsRef.current,
             });
 
+            polygonDrawerRef.current = new L.Draw.Polygon(state.mapInstance)
+
             // make 1 dispatch from these 3
             dispatch({type: "getDrawnItems", drawnItemsData : (drawnItemsRef.current)},);
             dispatch({type: "getPolygonEditor", polygonEditorData : (polygonEditorRef.current)},);
+            dispatch({type: "getPolygonDrawer", polygonDrawerData : (polygonDrawerRef.current)},);
             dispatch({type: "getDrawControl", drawControlData : (drawControlRef.current)});
 
             // TESTING EVENTS
@@ -223,7 +228,7 @@ function Map() {
             //     console.log('Start editing', e.target._layers);
             // });
 
-            // state.mapInstance.on('draw:edited ', function(e){
+            // state.mapInstance.on('draw:edited ', function(e){y
             //     // console.log('Edited', e.target);
             //     console.log('Edited', Object.values(e.target._layers).pop());
             // });
@@ -234,12 +239,17 @@ function Map() {
     // ADDING POLYGONS
     useEffect(() => {
         function getFeatureInfo(e){
+            dispatch({type:"getTempPolygonGeometry",tempPolygonGeom : "resetShape"})
             dispatch({type: "showPolygonsMenu", isTrue:state.showPolygonsMenu})
             dispatch({type:"getPolygonInfo", 
                 polygonName: e.target.feature.properties.name,
                 polygonGeom: e.target.getLatLngs(),
                 // polygonGeom: e.target.toGeoJSON().geometry.coordinates[0]}
             })
+            
+            if (state.drawnItems){
+                state.drawnItems.clearLayers();
+            }
         }
     
         function onEachFeature(feature, layer){
@@ -277,6 +287,22 @@ function Map() {
         state.polygonEditor.enable();
     };
 
+    const createPolygon = () =>{
+        dispatch({type:"turnOnEditing"})
+
+        state.polygonDrawer.setOptions({shapeOptions: {color: 'red', fillColor:'red'}})
+        state.polygonDrawer.enable();
+        state.drawnItems.clearLayers();
+
+        state.mapInstance.on('draw:created', function (e) {
+            tempLayerRef.current = e.layer;
+            dispatch({type:"getTempPolygon", tempPolygon:tempLayerRef.current})
+            state.drawnItems.clearLayers();
+            state.drawnItems.addLayer(tempLayerRef.current)
+            state.mapInstance.addLayer(state.drawnItems);
+        });
+    };
+
   
     const savePolygonChange = () => {
         dispatch({type:"turnOffEditing"})
@@ -302,13 +328,10 @@ function Map() {
 
         if (state.tempPolygonGeometry){
             tempLayerRef.current = new L.polygon(state.tempPolygonGeometry, {color:"red", fillColor:"red"})
-        } else {
-            tempLayerRef.current = new L.polygon(state.polygonGeometry, {color:"red", fillColor:"red"})
+            state.drawnItems.clearLayers();
+            state.drawnItems.addLayer(tempLayerRef.current)
+            state.mapInstance.addLayer(state.drawnItems);
         };
-
-        state.drawnItems.clearLayers();
-        state.drawnItems.addLayer(tempLayerRef.current)
-        state.mapInstance.addLayer(state.drawnItems);
 
         state.polygonEditor.disable();
     };
@@ -411,31 +434,39 @@ function Map() {
                                 <TextField id="outlined-basic" label="Temp Geometry" value={state.tempPolygonGeometry} variant="outlined" fullWidth size="small" multiline/>
 
                                 {!state.isEdited ? (
-                                    <Button 
-                                    variant="contained" 
-                                    style={{"backgroundColor":"black"}}
-                                    onClick={editPolygon}
-                                        > EDIT GEOMETRY
-                                    </Button>
-                                ) : (
                                     <div>
                                         <Button 
                                             variant="contained" 
                                             style={{"backgroundColor":"black"}}
-                                            onClick={savePolygonChange}
-                                                > SAVE CHANGES
+                                            onClick={createPolygon}
+                                                > DRAW
                                         </Button>
                                         <Button 
                                             variant="contained" 
                                             style={{"backgroundColor":"black"}}
-                                            onClick={cancelPolygonChange}
-                                                > CANCEL CHANGES
+                                            onClick={editPolygon}
+                                                > EDIT GEOMETRY
                                         </Button>
                                         <Button 
                                             variant="contained" 
                                             style={{"backgroundColor":"black"}}
                                             onClick={resetPolygonChange}
                                                 > RESET CHANGES
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <Button 
+                                            variant="contained" 
+                                            style={{"backgroundColor":"black"}}
+                                            onClick={savePolygonChange}
+                                                > SAVE
+                                        </Button>
+                                        <Button 
+                                            variant="contained" 
+                                            style={{"backgroundColor":"black"}}
+                                            onClick={cancelPolygonChange}
+                                                > CANCEL
                                         </Button>
                                     </div>
                                 )}
