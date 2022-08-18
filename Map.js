@@ -141,7 +141,12 @@ function Map() {
                 draft.showPointsMenu = false;
                 draft.showLinesMenu = false;
                 break;   
-            }
+
+            case "switchMapFeature":
+                draft.drawnItems.clearLayers();
+                draft.polygonDrawer.disable();
+                draft.polygonEditor.disable();
+            };
         };
 
     const [state, dispatch] = useImmerReducer(reducerFunction, initialState)
@@ -239,7 +244,10 @@ function Map() {
     // ADDING POLYGONS
     useEffect(() => {
         function getFeatureInfo(e){
+            dispatch({type:"switchMapFeature"})
             dispatch({type:"getTempPolygonGeometry",tempPolygonGeom : "resetShape"})
+            dispatch({type:"turnOffEditing"})
+
             dispatch({type: "showPolygonsMenu", isTrue:state.showPolygonsMenu})
             dispatch({type:"getPolygonInfo", 
                 polygonName: e.target.feature.properties.name,
@@ -447,12 +455,13 @@ function Map() {
                                             onClick={editPolygon}
                                                 > EDIT GEOMETRY
                                         </Button>
+                                        {state.tempPolygonGeometry ? 
                                         <Button 
                                             variant="contained" 
                                             style={{"backgroundColor":"black"}}
                                             onClick={resetPolygonChange}
                                                 > RESET CHANGES
-                                        </Button>
+                                        </Button> : ""}
                                     </div>
                                 ) : (
                                     <div>
