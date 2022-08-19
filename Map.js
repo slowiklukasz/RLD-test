@@ -1,7 +1,7 @@
 // https://www.youtube.com/watch?v=KLrcnwBQgCc
 // https://github.com/FuzedxPheonix/Leaftlet-Draw-Get-Started-Templated
 
-import React, { useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useImmerReducer } from 'use-immer';
 import '../App.css';
 import L from "leaflet";
@@ -10,7 +10,8 @@ import "leaflet-draw/dist/leaflet.draw.css";
 // LEAFLET, REACT-LEAFLET
 import { MapContainer, TileLayer, FeatureGroup, Polyline, Polygon, Popup, useMap} from 'react-leaflet'
 // @MUI
-import {Grid, AppBar, Stack, Button, Typography, TextField} from '@mui/material';
+import {Grid, AppBar, Stack, Button, Typography, TextField,
+Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper}from '@mui/material';
 
 // TESTING POLYGONS
 import PolygonsTest from './Assets/PolygonsTest.js'
@@ -19,6 +20,7 @@ const leafletDraw = require('leaflet-draw');
 
 
 function Map() {
+
     // IMMER REDUCER
     const initialState = {
         mapInstance: null,
@@ -142,7 +144,7 @@ function Map() {
                 draft.showLinesMenu = false;
                 break;   
 
-            case "switchMapFeature":
+            case "switchMapFeature":               
                 draft.drawnItems.clearLayers();
                 draft.polygonDrawer.disable();
                 draft.polygonEditor.disable();
@@ -267,7 +269,7 @@ function Map() {
         };
 
         if (state.mapInstance){
-            L.geoJSON(PolygonsTest, {
+            let lstOfPolygons = L.geoJSON(PolygonsTest, {
                 onEachFeature: onEachFeature
             }).addTo(state.mapInstance)
         }
@@ -333,10 +335,10 @@ function Map() {
 
     const cancelPolygonChange = () => {
         dispatch({type:"turnOffEditing"})
-
+        state.drawnItems.clearLayers();
+        
         if (state.tempPolygonGeometry){
             tempLayerRef.current = new L.polygon(state.tempPolygonGeometry, {color:"red", fillColor:"red"})
-            state.drawnItems.clearLayers();
             state.drawnItems.addLayer(tempLayerRef.current)
             state.mapInstance.addLayer(state.drawnItems);
         };
@@ -353,6 +355,19 @@ function Map() {
     };
 
 
+
+    // TABLE
+    function createData(name, data, geom) {
+        return { name, data, geom};
+    };
+
+    const rows = [
+    createData('Polygon1', 159, 6.0),
+    createData('Polygon2', 237, 9.0),
+    createData('Polygon3', 262, 16.0),
+    ];
+
+
     return (
         <>
             <Grid container>         
@@ -364,7 +379,9 @@ function Map() {
                             variant="contained" 
                             style={{"backgroundColor":"black"}}
                             size="large"
-                            onClick= {(e)=>dispatch({type: "showPlacesMenu", isTrue:state.showPlacesMenu})}
+                            onClick= {(e)=> (
+                                resetPolygonChange(),
+                                dispatch({type: "showPlacesMenu", isTrue:state.showPlacesMenu}))}
                                 > PLACES
                         </Button>
 
@@ -384,7 +401,9 @@ function Map() {
                             variant="contained" 
                             style={{"backgroundColor":"black"}}
                             size="large"
-                            onClick= {(e)=>dispatch({type: "showPointsMenu", isTrue:state.showPointsMenu})}
+                            onClick= {(e)=> (
+                                resetPolygonChange(),
+                                dispatch({type: "showPointsMenu", isTrue:state.showPointsMenu}))}
                              > POINTS
                         </Button>
 
@@ -404,7 +423,9 @@ function Map() {
                             variant="contained" 
                             style={{"backgroundColor":"black"}}
                             size="large"
-                            onClick= {(e)=>dispatch({type: "showLinesMenu", isTrue:state.showLinesMenu})}
+                            onClick= {(e)=> (
+                                resetPolygonChange(),
+                                dispatch({type: "showLinesMenu", isTrue:state.showLinesMenu}))}
                                 > LINES
                         </Button>
 
@@ -425,9 +446,53 @@ function Map() {
                             variant="contained" 
                             style={{"backgroundColor":"black"}}
                             size="large"
-                            onClick= {(e)=>dispatch({type: "showPolygonsMenu", isTrue:state.showPolygonsMenu})}
+                            onClick= {(e)=> (
+                                // resetPolygonChange(),
+                                dispatch({type: "showPolygonsMenu", isTrue:state.showPolygonsMenu}))}
                                 > POLYGONS
                         </Button>
+
+                        {/* HARDCODED - WILL BE REPLACED WITH MAP FUNCTION ON OBJECT FROM AXIOS REQUEST */}
+                        <Grid container justifyContent="center">
+                            <Grid item xs={10}>
+                                <TextField id="outlined-basic" label="Polygons" variant="outlined" fullWidth size="small"/>
+                            </Grid>
+                            <Grid item xs={2}>
+                                <Button variant="contained" style={{"backgroundColor":"black"}} fullWidth > LUPKA </Button>
+                            </Grid>
+
+                            {/*  */}
+                            <TableContainer component={Paper}>
+                                <Table sx={{ minWidth: 450 }} aria-label="simple table">
+                                    <TableHead>
+                                    <TableRow>
+                                        <TableCell align="center">Number</TableCell>
+                                        <TableCell align="center">Edit</TableCell>
+                                        <TableCell align="center">Zoom</TableCell>
+                                    </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                    {rows.map((row) => (
+                                        <TableRow
+                                        key={row.name}
+                                        sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                                        >
+                                        <TableCell align="center">{row.name}</TableCell>
+                                        <TableCell align="right">
+                                            <Button variant="contained" style={{"backgroundColor":"black"}} fullWidth > Edit </Button>
+                                        </TableCell>
+                                        <TableCell align="right">
+                                            <Button variant="contained" style={{"backgroundColor":"black"}} fullWidth > Zoom </Button>
+                                        </TableCell>
+                                        </TableRow>
+                                    ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+    
+                        </Grid>
+
+
 
                         {state.showPolygonsMenu ? (
                             <Grid container justifyContent="center">
@@ -435,7 +500,7 @@ function Map() {
                                     <TextField id="outlined-basic" label="Polygons" variant="outlined" fullWidth size="small"/>
                                 </Grid>
                                 <Grid item xs={2}>
-                                    <Button variant="contained" style={{"backgroundColor":"black"}} fullWidth > SEARCH</Button>
+                                    <Button variant="contained" style={{"backgroundColor":"black"}} fullWidth > SEARCH </Button>
                                 </Grid>
                                 <TextField id="outlined-basic" label ="Name" value={state.polygonName} variant="outlined" fullWidth size="small"/>
                                 <TextField id="outlined-basic" label="Geometry" value={state.polygonGeometry} variant="outlined" fullWidth size="small" multiline/>
@@ -447,14 +512,18 @@ function Map() {
                                             variant="contained" 
                                             style={{"backgroundColor":"black"}}
                                             onClick={createPolygon}
-                                                > DRAW
+                                                > {state.polygonGeometry ? "RE-DRAW" : "DRAW"}
+                                                
                                         </Button>
-                                        <Button 
-                                            variant="contained" 
-                                            style={{"backgroundColor":"black"}}
-                                            onClick={editPolygon}
-                                                > EDIT GEOMETRY
-                                        </Button>
+                                        {state.polygonGeometry ? (
+                                            <Button 
+                                                variant="contained" 
+                                                style={{"backgroundColor":"black"}}
+                                                onClick={editPolygon}
+                                                    > EDIT GEOMETRY
+                                            </Button>
+                                        ) : ""}
+                                        
                                         {state.tempPolygonGeometry ? 
                                         <Button 
                                             variant="contained" 
