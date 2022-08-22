@@ -12,6 +12,9 @@ import { MapContainer, TileLayer, FeatureGroup, Polyline, Polygon, Popup, useMap
 // @MUI
 import {Grid, AppBar, Stack, Button, Typography, TextField,
 Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper}from '@mui/material';
+// pagination
+import Pagination from '@mui/material/Pagination';
+
 
 // TESTING POLYGONS
 import PolygonsTest from './Assets/PolygonsTest.js'
@@ -33,15 +36,21 @@ function Map() {
         tempPolygon: "",
         tempPolygonGeometry: "",
 
+        // TEMPORARY POLYGON LST
+        dummyDataPolygons : [],
+
         // POLYGON INFO
         polygonName: "",
         polygonGeometry: "",
 
-        // MENU PANELS
-        showPlacesMenu: false,
-        showPointsMenu: false,
-        showLinesMenu: false,
-        showPolygonsMenu: false,
+        // PANELS
+        showPlacesPanel: false,
+        showPointsPanel: false,
+        showLinesPanel: false,
+        showPolygonsPanel: false,
+
+        // CARDS
+        showPolygonCard: false,
     };
 
     function reducerFunction(draft, action){
@@ -64,6 +73,11 @@ function Map() {
             case "getPolygonInfo":
                 draft.polygonName = action.polygonName;
                 draft.polygonGeometry = action.polygonGeom;
+                break;
+            
+            // TEMPORARY POLYGON LST
+            case "getTempPolygonList":
+                draft.dummyDataPolygons = action.tempPolygonLst
                 break;
             
             // EDITING POLYGON GEOMETRY
@@ -96,53 +110,64 @@ function Map() {
                 break;
 
             // SWITCHING MENU PANELS
-            case "showPlacesMenu":
-                if (!action.isTrue){
-                    draft.showPlacesMenu =  true
+            case "showPlacesPanel":
+                if (!action.isOpened){
+                    draft.showPlacesPanel =  true
                 } else {
-                    draft.showPlacesMenu =  false;
+                    draft.showPlacesPanel =  false;
                 }
                 
-                draft.showPointsMenu = false;
-                draft.showLinesMenu = false;
-                draft.showPolygonsMenu = false;
+                draft.showPointsPanel = false;
+                draft.showLinesPanel = false;
+                draft.showPolygonsPanel = false;
                 break;
 
-            case "showPointsMenu":
-                if (!action.isTrue){
-                    draft.showPointsMenu =  true
+            case "showPointsPanel":
+                if (!action.isOpened){
+                    draft.showPointsPanel =  true
                 } else {
-                    draft.showPointsMenu =  false;
+                    draft.showPointsPanel =  false;
                 }
                 
-                draft.showPlacesMenu = false;
-                draft.showLinesMenu = false;
-                draft.showPolygonsMenu = false;
+                draft.showPlacesPanel = false;
+                draft.showLinesPanel = false;
+                draft.showPolygonsPanel = false;
                 break;
 
-            case "showLinesMenu":
-                if (!action.isTrue){
-                    draft.showLinesMenu =  true
+            case "showLinesPanel":
+                if (!action.isOpened){
+                    draft.showLinesPanel =  true
                 } else {
-                    draft.showLinesMenu =  false;
+                    draft.showLinesPanel =  false;
                 }
                 
-                draft.showPlacesMenu = false;
-                draft.showPointsMenu = false;
-                draft.showPolygonsMenu = false;
+                draft.showPlacesPanel = false;
+                draft.showPointsPanel = false;
+                draft.showPolygonsPanel = false;
                 break;
 
-            case "showPolygonsMenu":
-                if (!action.isTrue){
-                    draft.showPolygonsMenu =  true;
+            case "showPolygonsPanel":
+                if (!action.isOpened){
+                    draft.showPolygonsPanel =  true;
                 } else {
-                    draft.showPolygonsMenu =  false;
+                    draft.showPolygonsPanel =  false;
                 }
                 
-                draft.showPlacesMenu = false;
-                draft.showPointsMenu = false;
-                draft.showLinesMenu = false;
-                break;   
+                draft.showPlacesPanel = false;
+                draft.showPointsPanel = false;
+                draft.showLinesPanel = false;
+                break;
+
+            // CARDS
+            case "showPolygonCard":
+                if (!action.isOpened){
+                    draft.showPolygonCard =  true;
+                    console.log('Polygon card on')
+                } else {
+                    draft.showPolygonCard =  false;
+                    console.log('Polygon card off')
+                };
+                break;
 
             case "switchMapFeature":               
                 draft.drawnItems.clearLayers();
@@ -250,7 +275,9 @@ function Map() {
             dispatch({type:"getTempPolygonGeometry",tempPolygonGeom : "resetShape"})
             dispatch({type:"turnOffEditing"})
 
-            dispatch({type: "showPolygonsMenu", isTrue:state.showPolygonsMenu})
+            // dispatch({type: "showPolygonsPanel", isOpened:state.showPolygonsPanel})
+            dispatch({type: "showPolygonsPanel", isOpened:true})
+            dispatch({type: "showPolygonCard", isOpened:state.showPolygonCard})
             dispatch({type:"getPolygonInfo", 
                 polygonName: e.target.feature.properties.name,
                 polygonGeom: e.target.getLatLngs(),
@@ -261,11 +288,14 @@ function Map() {
                 state.drawnItems.clearLayers();
             }
         }
-    
+        var tempPolygonList = []
         function onEachFeature(feature, layer){
             layer.on({
                 click: getFeatureInfo
             })
+            tempPolygonList.push(layer);
+            console.log(tempPolygonList)
+            dispatch({type:"getTempPolygonList", tempPolygonLst: tempPolygonList})
         };
 
         if (state.mapInstance){
@@ -355,19 +385,6 @@ function Map() {
     };
 
 
-
-    // TABLE
-    function createData(name, data, geom) {
-        return { name, data, geom};
-    };
-
-    const rows = [
-    createData('Polygon1', 159, 6.0),
-    createData('Polygon2', 237, 9.0),
-    createData('Polygon3', 262, 16.0),
-    ];
-
-
     return (
         <>
             <Grid container>         
@@ -381,11 +398,13 @@ function Map() {
                             size="large"
                             onClick= {(e)=> (
                                 resetPolygonChange(),
-                                dispatch({type: "showPlacesMenu", isTrue:state.showPlacesMenu}))}
+                                dispatch({type: "showPlacesPanel", isOpened:state.showPlacesPanel}),
+                                dispatch({type: "showPolygonCard", isOpened:true})
+                                )}
                                 > PLACES
                         </Button>
 
-                        {state.showPlacesMenu ? (
+                        {state.showPlacesPanel ? (
                             <Grid container justifyContent="center">
                                 <Grid item xs={10}>
                                     <TextField id="outlined-basic" label="Places" variant="outlined" fullWidth size="small"/>
@@ -403,11 +422,13 @@ function Map() {
                             size="large"
                             onClick= {(e)=> (
                                 resetPolygonChange(),
-                                dispatch({type: "showPointsMenu", isTrue:state.showPointsMenu}))}
+                                dispatch({type: "showPointsPanel", isOpened:state.showPointsPanel}),
+                                dispatch({type: "showPolygonCard", isOpened:true})
+                                )}
                              > POINTS
                         </Button>
 
-                        {state.showPointsMenu ? (
+                        {state.showPointsPanel ? (
                             <Grid container justifyContent="center">
                                 <Grid item xs={10}>
                                     <TextField id="outlined-basic" label="Points" variant="outlined" fullWidth size="small"/>
@@ -425,11 +446,13 @@ function Map() {
                             size="large"
                             onClick= {(e)=> (
                                 resetPolygonChange(),
-                                dispatch({type: "showLinesMenu", isTrue:state.showLinesMenu}))}
+                                dispatch({type: "showLinesPanel", isOpened:state.showLinesPanel}),
+                                dispatch({type: "showPolygonCard", isOpened:true})
+                                )}
                                 > LINES
                         </Button>
 
-                        {state.showLinesMenu ? (
+                        {state.showLinesPanel ? (
                             <Grid container justifyContent="center">
                                 <Grid item xs={10}>
                                     <TextField id="outlined-basic" label="Lines" variant="outlined" fullWidth size="small"/>
@@ -448,60 +471,99 @@ function Map() {
                             size="large"
                             onClick= {(e)=> (
                                 // resetPolygonChange(),
-                                dispatch({type: "showPolygonsMenu", isTrue:state.showPolygonsMenu}))}
+                                dispatch({type: "showPolygonsPanel", isOpened:state.showPolygonsPanel}))}
                                 > POLYGONS
                         </Button>
 
-                        {/* HARDCODED - WILL BE REPLACED WITH MAP FUNCTION ON OBJECT FROM AXIOS REQUEST */}
-                        <Grid container justifyContent="center">
+                        {state.showPolygonsPanel ? (
+                            <Grid container justifyContent="center">
                             <Grid item xs={10}>
                                 <TextField id="outlined-basic" label="Polygons" variant="outlined" fullWidth size="small"/>
                             </Grid>
                             <Grid item xs={2}>
-                                <Button variant="contained" style={{"backgroundColor":"black"}} fullWidth > LUPKA </Button>
+                                <Button variant="contained" style={{"backgroundColor":"black"}} fullWidth > SEARCH </Button>
+                                <Button variant="contained" style={{"backgroundColor":"black"}} fullWidth > ADD NEW </Button>
                             </Grid>
 
-                            {/*  */}
+                       
                             <TableContainer component={Paper}>
                                 <Table sx={{ minWidth: 450 }} aria-label="simple table">
-                                    <TableHead>
-                                    <TableRow>
-                                        <TableCell align="center">Number</TableCell>
-                                        <TableCell align="center">Edit</TableCell>
-                                        <TableCell align="center">Zoom</TableCell>
-                                    </TableRow>
-                                    </TableHead>
+      
                                     <TableBody>
-                                    {rows.map((row) => (
+                                    {state.dummyDataPolygons.map((polygon) => (
                                         <TableRow
-                                        key={row.name}
+                                        key={polygon._lealfet_id}
                                         sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
                                         >
-                                        <TableCell align="center">{row.name}</TableCell>
+                                        <TableCell align="center">{polygon.feature.properties.name}</TableCell>
                                         <TableCell align="right">
-                                            <Button variant="contained" style={{"backgroundColor":"black"}} fullWidth > Edit </Button>
+                                            <Button 
+                                                variant="contained" 
+                                                style={{"backgroundColor":"black"}} 
+                                                fullWidth
+                                                onClick={()=>
+                                                    dispatch({type: "showPolygonCard", isOpened:false},
+                                                    dispatch({type: "showPolygonsPanel", isOpened:state.showPolygonsPanel}),
+                                                    dispatch({type:"getPolygonInfo", 
+                                                        polygonName: polygon.feature.properties.name,
+                                                        polygonGeom: polygon.getLatLngs(),
+                                                        })
+                                                    )}
+                                                > 
+                                                    Edit 
+                                            </Button>
                                         </TableCell>
                                         <TableCell align="right">
-                                            <Button variant="contained" style={{"backgroundColor":"black"}} fullWidth > Zoom </Button>
+                                            <Button 
+                                                variant="contained" 
+                                                style={{"backgroundColor":"black"}} 
+                                                fullWidth 
+                                                onClick={()=>state.mapInstance.fitBounds(polygon.getBounds().pad(1))} 
+                                                > 
+                                                    Zoom 
+                                            </Button>
                                         </TableCell>
                                         </TableRow>
                                     ))}
                                     </TableBody>
                                 </Table>
                             </TableContainer>
+
+                            {/* pagination */}
+                            <Stack spacing={2}>
+                                <Pagination count={Math.ceil(state.dummyDataPolygons.length/2) < 1 ? 1:Math.ceil(state.dummyDataPolygons.length/2)} variant="outlined" shape="rounded" />
+                            </Stack>
     
                         </Grid>
+                        ) : ""}
+                    
 
-
-
-                        {state.showPolygonsMenu ? (
+                        {state.showPolygonCard ? (
                             <Grid container justifyContent="center">
-                                <Grid item xs={10}>
+                                <Grid item xs={12}>
+                                    <Stack spacing={2} direction="rows">
+                                        <Button variant="contained" style={{"backgroundColor":"green"}} fullWidth > SAVE </Button>
+                                        <Button variant="contained" style={{"backgroundColor":"red"}} fullWidth > DELETE </Button>
+                                        <Button 
+                                            variant="contained" 
+                                            style={{"backgroundColor":"grey"}} 
+                                            fullWidth
+                                            onClick ={()=>{
+                                                console.log("canceled")
+                                                dispatch({type: "showPolygonCard", isOpened:true})
+                                                dispatch({type: "showPolygonsPanel", isOpened:false})
+                                                }}
+                                            > 
+                                                CANCEL 
+                                        </Button>
+                                    </Stack>
+                                </Grid>
+                                {/* <Grid item xs={10}>
                                     <TextField id="outlined-basic" label="Polygons" variant="outlined" fullWidth size="small"/>
                                 </Grid>
                                 <Grid item xs={2}>
                                     <Button variant="contained" style={{"backgroundColor":"black"}} fullWidth > SEARCH </Button>
-                                </Grid>
+                                </Grid> */}
                                 <TextField id="outlined-basic" label ="Name" value={state.polygonName} variant="outlined" fullWidth size="small"/>
                                 <TextField id="outlined-basic" label="Geometry" value={state.polygonGeometry} variant="outlined" fullWidth size="small" multiline/>
                                 <TextField id="outlined-basic" label="Temp Geometry" value={state.tempPolygonGeometry} variant="outlined" fullWidth size="small" multiline/>
